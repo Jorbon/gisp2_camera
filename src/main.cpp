@@ -4,15 +4,15 @@
 
 #include "common.h"
 #include "sccb.h"
-#include "ov2640_regs.h"
+#include "reg_lists.h"
 
 
 
-#define VSYNC 2
-#define HREF 3
-#define PCLK 4
-#define XCLK 12
-#define RESET 6
+#define VSYNC_gpio 2
+#define HREF_gpio 3
+#define PCLK_gpio 4
+#define XCLK_gpio 12
+#define RESET_gpio 6
 
 static const u8 DATA_PINS[8] = { 22, 23, 20, 21, 38, 39, 26, 27 };
 
@@ -33,84 +33,7 @@ void write_regs(RegisterEntry const* regs) {
 
 
 
-static u8 regs[512] = { 0 };
 
-void print_regs() {
-	printf("\t");
-	for (int j = 0; j < 16; j++) printf("%x\t", j);
-	printf("\n");
-	for (int j = 0; j < 16; j++) printf("--------");
-	printf("\n ");
-	
-	for (int i = 0; i < 512; i += 16) {
-		if (!(i >> 8)) printf(" ");
-		printf("%x |\t", i);
-		for (int j = i; j < i+16; j++) {
-			printf("%x\t", regs[j]);
-		}
-		printf("\n");
-	}
-}
-
-void read_regs() {
-	sccb_write(0xff, 0).unwrap();
-	for (int i = 0; i < 256; i++) {
-		let r = sccb_read(i);
-		regs[i] = r.value.ok_value;
-		if (r.type == ResultType::Err) printf("H %x\n", i);
-	}
-	sccb_write(0xff, 1).unwrap();
-	for (int i = 0; i < 256; i++) {
-		regs[i + 256] = sccb_read(i).unwrap();
-		// printf("H2 %x\n", i);
-	}
-}
-
-void report_reg_diffs() {
-	let no_changes = true;
-	u8 value = sccb_read(0xff).unwrap();
-	sccb_write(0xff, value & 0b11111110).unwrap();
-	for (int i = 0; i < 256; i++) {
-		u8 new_value = sccb_read(i).unwrap();
-		if (regs[i] != new_value) {
-			printf("Register %x changed: %x -> %x\n", i, regs[i], new_value);
-			no_changes = false;
-		}
-	}
-	sccb_write(0xff, value | 0b00000001).unwrap();
-	for (int i = 0; i < 256; i++) {
-		u8 new_value = sccb_read(i).unwrap();
-		if (regs[i+256] != new_value) {
-			printf("Register %x changed: %x -> %x\n", i+256, regs[i+256], new_value);
-			no_changes = false;
-		}
-	}
-	if (no_changes) printf("No registers changed.\n");
-}
-
-void read_regs_report_diffs() {
-	let no_changes = true;
-	u8 value = sccb_read(0xff).unwrap();
-	sccb_write(0xff, value & 0b11111110).unwrap();
-	for (int i = 0; i < 256; i++) {
-		u8 new_value = sccb_read(i).unwrap();
-		if (regs[i] != new_value) {
-			printf("Register %x updated: %x -> %x\n", i, regs[i], new_value);
-			regs[i] = new_value;
-			no_changes = false;
-		}
-	}
-	sccb_write(0xff, value | 0b00000001).unwrap();
-	for (int i = 0; i < 256; i++) {
-		u8 new_value = sccb_read(i).unwrap();
-		if (regs[i+256] != new_value) {
-			printf("Register %x updated: %x -> %x\n", i+256, regs[i+256], new_value);
-			regs[i+256] = new_value;
-			no_changes = false;
-		}
-	}
-	if (no_changes) printf("No registers updated.\n");
-}
 
 
 
@@ -119,98 +42,148 @@ void read_regs_report_diffs() {
 static u32 i = 0;
 // static u8 buf[BUF_SIZE] = { 0 };
 
+static bool href = false;
+static bool vsync = false;
+
 void on_pclk() {
-	// if (!digitalReadFast(VSYNC)) {
-	// 	i = 0;
-	// 	return;
-	// }
+	if (digitalReadFast(VSYNC_gpio) && digitalReadFast(HREF_gpio)) {
+		u8 value = GPIO6_PSR >> 24;
+		if (!(value >> 4)) printf("0");
+		printf("%x", value);
+		// buf[i] = GPIO6_PSR >> 24;
+		// i++;
+		// if (i >= BUF_SIZE) i = 0;
+	}
 	
-	i++;
 }
 
 void on_href() {
-	// i++;
+	printf("\n");
 }
 
 void on_vsync() {
-	// printf("\n");
+	printf("\n\n\n\n");
 }
 
 
 
 
-void setup() {
+int main() {
 	
 	Wire.begin();
 	Serial.begin(115200);
 	
-	pinMode(RESET, OUTPUT);
-	pinMode(XCLK, OUTPUT);
+	pinMode(RESET_gpio, OUTPUT);
+	pinMode(XCLK_gpio, OUTPUT);
 	
-	pinMode(VSYNC, INPUT);
-	pinMode(HREF, INPUT);
-	pinMode(PCLK, INPUT);
+	pinMode(VSYNC_gpio, INPUT);
+	pinMode(HREF_gpio, INPUT);
+	pinMode(PCLK_gpio, INPUT);
 	for (u8 i = 0; i < 8; i++) pinMode(DATA_PINS[i], INPUT);
 	
-	digitalWrite(RESET, HIGH);
+	digitalWrite(RESET_gpio, LOW);
 	
-	
-	// digitalWrite(RESET, LOW);
-	
-	analogWriteFrequency(XCLK, XCLK_FREQUENCY);
-	analogWrite(XCLK, 128);
+	analogWriteFrequency(XCLK_gpio, XCLK_FREQUENCY);
+	analogWrite(XCLK_gpio, 128);
 	
 	delay(10);
+	
+	digitalWrite(RESET_gpio, HIGH);
+	delay(1);
 	
 	sccb_write(0xff, 1).unwrap();
 	sccb_write(0x12, 0x80).unwrap();
 	
-	delay(50);
+	delay(10);
 	
-	while (!Serial) delay(100);
+	while (!Serial) delay(50);
 	printf("Hello!\n");
 	
 	
-	write_regs(OV2640_QVGA);
-	// write_regs(OV2640_YUV422);
+	write_regs(ov2640_init_regs);
+	write_regs(ov2640_size_change_preamble_regs);
+	write_regs(ov2640_qvga_regs);
 	
-	sccb_write(0xff, 1).unwrap();
-	sccb_write(0x11, 3).unwrap(); // Clock divider (max 63)
-	sccb_write(0x12, 0x02).unwrap(); // Color bar test
-	sccb_write(0x15, 0b00100000).unwrap(); // PCLK only while href
+	write_regs(ov2640_raw10_regs);
+	
+	printf("Written regs\n");
+	
+	// write_regs(ov2640_jpeg_regs);
+	
+	
 	delay(1);
 	
-	sccb_write(0xff, 0).unwrap();
-	sccb_write(0xc2, 0x00000010).unwrap(); // Enable raw
-	sccb_write(0xda, 0b00000100).unwrap(); // Select raw
+	sccb_write(0xff, 1).unwrap();
+	sccb_write(CLKRC, CLKRC_DIV_SET(20)).unwrap(); // Clock divider (max 63)
+	sccb_write(COM7, COM7_RES_UXGA | COM7_ZOOM_EN | COM7_COLOR_BAR_TEST).unwrap(); // Color bar test
+	
+	// sccb_write(0xff, 0).unwrap();
+	// sccb_write(0xc2, 0x00000010).unwrap(); // Enable raw
+	// sccb_write(0xda, 0b00000100).unwrap(); // Select raw
 	
 	delay(10);
 	
 	
-	// attachInterrupt(digitalPinToInterrupt(VSYNC), on_vsync, FALLING);
-	// attachInterrupt(digitalPinToInterrupt(HREF), on_href, FALLING);
-	// attachInterrupt(digitalPinToInterrupt(PCLK), on_pclk, FALLING);
+	attachInterrupt(digitalPinToInterrupt(VSYNC_gpio), on_vsync, FALLING);
+	attachInterrupt(digitalPinToInterrupt(HREF_gpio), on_href, FALLING);
+	attachInterrupt(digitalPinToInterrupt(PCLK_gpio), on_pclk, FALLING);
 	
+	return 0;
+	
+	u32 count = 0;
+	u32 count_2 = 0;
+	bool href_past = 0;
+	bool vsync_past = 0;
+	
+	while (true) {
+		bool href = digitalReadFast(HREF_gpio);
+		bool vsync = digitalReadFast(VSYNC_gpio);
+		
+		if (vsync && href) {
+			u8 value = GPIO6_PSR >> 24;
+			printf("%d: %d %d\t%d\n", i, href, vsync, value);
+		}
+		// i = 0;
+		
+		// if (!href && (href != href_past)) {
+		// 	count++;
+		// 	// printf("h\n");
+		// }
+		
+		// if (!vsync && (vsync != vsync_past)) {
+		// 	printf("\n%d href in 1 vsync\n\n", count);
+		// 	if (count > 100) {
+		// 		count_2++;
+		// 		if (count_2 >= 1) {
+		// 			for (u32 j = 0; j < BUF_SIZE; j++) {
+		// 				if (!(buf[i] >> 4)) printf("0");
+		// 				printf("%x", buf[i]);
+		// 			}
+		// 			printf("\n\n%d out of %d samples captured\n", i, BUF_SIZE);
+					
+		// 			exit(0);
+		// 		}
+		// 	}
+		// 	count = 0;
+		// } else if (vsync && (vsync != vsync_past)) {
+		// 	printf("%d href outside vsync\n", count);
+		// 	count = 0;
+		// }
+		
+		// href_past = href;
+		// vsync_past = vsync;
+		
+		// delay(1);
+		
+		// u32 time = ARM_DWT_CYCCNT;
+		// u8 value = GPIO6_PSR >> 24;
+		// printf("%d %d %d %d\n", digitalReadFast(PCLK), digitalReadFast(HREF), digitalReadFast(VSYNC), value);
+	}
+	
+	
+	return 0;
 }
 
-
-static u32 count = 0;
-
-void loop() {
-	// printf("%d: %d %d\n", i, digitalReadFast(HREF), digitalReadFast(VSYNC));
-	// count += i;
-	// if (i == 0) {
-	// 	printf("count: %d\n", count);
-	// 	count = 0;
-	// }
-	// i = 0;
-	// delay(1);
-	
-	// u32 time = ARM_DWT_CYCCNT;
-	// u8 value = GPIO6_PSR >> 24;
-	// printf("%d %d %d %d\n", digitalReadFast(PCLK), digitalReadFast(HREF), digitalReadFast(VSYNC), value);
-	
-}
 
 
 
