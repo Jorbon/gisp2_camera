@@ -351,7 +351,7 @@ static const RegisterEntry ov2640_raw10_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
 	{ IMAGE_MODE, IMAGE_MODE_RAW10 },
-	{ CTRL0,  CTRL0_RAW_EN },
+	// { CTRL0,  CTRL0_RAW_EN },
 	{ 0xd7, 0x03 },
 	{ RESET,  0x00 },
 	{ R_BYPASS, R_BYPASS_USE_DSP },

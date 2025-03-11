@@ -49,7 +49,7 @@ struct Result {
 	
 	T unwrap() const {
 		if (this->type != ResultType::Ok) {
-			fprintf(stderr, "Tried to unwrap err value.\n");
+			fprintf(stderr, "Tried to unwrap err value: %s\n", this->value.err_value);
 			exit(1);
 		}
 		

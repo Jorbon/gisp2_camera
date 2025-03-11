@@ -24,9 +24,7 @@ void write_regs(RegisterEntry const* regs) {
 	while (true) {
 		let reg = *regs;
 		if (reg.address == 0xff && reg.value == 0xff) break;
-		// printf("Writing %x to %x\n", reg.value, reg.address);
 		sccb_write(reg.address, reg.value).unwrap();
-		
 		regs++;
 	}
 }
@@ -42,27 +40,21 @@ void write_regs(RegisterEntry const* regs) {
 static u32 i = 0;
 // static u8 buf[BUF_SIZE] = { 0 };
 
-static bool href = false;
-static bool vsync = false;
 
 void on_pclk() {
-	if (digitalReadFast(VSYNC_gpio) && digitalReadFast(HREF_gpio)) {
+	if (digitalReadFast(HREF_gpio) && digitalReadFast(VSYNC_gpio)) {
 		u8 value = GPIO6_PSR >> 24;
-		if (!(value >> 4)) printf("0");
-		printf("%x", value);
-		// buf[i] = GPIO6_PSR >> 24;
-		// i++;
-		// if (i >= BUF_SIZE) i = 0;
+		Serial1.printf("%c%c", 0, value);
 	}
 	
 }
 
 void on_href() {
-	printf("\n");
+	Serial1.printf("%c%c", 1, 0);
 }
 
 void on_vsync() {
-	printf("\n\n\n\n");
+	Serial1.printf("%c%c", 2, 0);
 }
 
 
@@ -72,6 +64,7 @@ int main() {
 	
 	Wire.begin();
 	Serial.begin(115200);
+	Serial1.begin(3000000);
 	
 	pinMode(RESET_gpio, OUTPUT);
 	pinMode(XCLK_gpio, OUTPUT);
@@ -114,8 +107,8 @@ int main() {
 	delay(1);
 	
 	sccb_write(0xff, 1).unwrap();
-	sccb_write(CLKRC, CLKRC_DIV_SET(20)).unwrap(); // Clock divider (max 63)
-	sccb_write(COM7, COM7_RES_UXGA | COM7_ZOOM_EN | COM7_COLOR_BAR_TEST).unwrap(); // Color bar test
+	sccb_write(CLKRC, CLKRC_DIV_SET(8)).unwrap(); // Clock divider (max 64)
+	// sccb_write(COM7, COM7_RES_UXGA | COM7_ZOOM_EN | COM7_COLOR_BAR_TEST).unwrap(); // Color bar test
 	
 	// sccb_write(0xff, 0).unwrap();
 	// sccb_write(0xc2, 0x00000010).unwrap(); // Enable raw
