@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <cstdlib>
+#include <DMAChannel.h>
 
 #include "common.h"
 #include "sccb.h"
@@ -35,28 +36,36 @@ void write_regs(RegisterEntry const* regs) {
 
 
 
-#define BUF_SIZE 320*240
+#define BUF_SIZE 320*2
 
-static u32 i = 0;
-// static u8 buf[BUF_SIZE] = { 0 };
+static u32 buf[BUF_SIZE] = { 0 };
 
+static DMAChannel dma_channel;
 
-void on_pclk() {
-	if (digitalReadFast(HREF_gpio) && digitalReadFast(VSYNC_gpio)) {
-		u8 value = GPIO6_PSR >> 24;
-		Serial1.printf("%c%c", 0, value);
-	}
-	
-}
 
 void on_href() {
-	Serial1.printf("%c%c", 1, 0);
+	dma_channel.enable();
 }
 
 void on_vsync() {
-	Serial1.printf("%c%c", 2, 0);
+	static const u8 vsync_pattern[] = { 2, 2, 253, 253 };
+	Serial.write(vsync_pattern, 4);
 }
 
+
+void on_dma() {
+	dma_channel.clearInterrupt();
+	asm("DSB");
+	// arm_dcache_delete(buf, BUF_SIZE*4);
+	
+	for (u32 i = 0; i < 80; i++) {
+		// Serial.printf("%d ", buf[i] >> 24);
+		Serial.write(buf[i] >> 24);
+	}
+	// Serial.printf("\n");
+	static const u8 href_pattern[] = { 1, 1, 254, 254 };
+	Serial.write(href_pattern, 4);
+}
 
 
 
@@ -64,24 +73,56 @@ int main() {
 	
 	Wire.begin();
 	Serial.begin(115200);
-	Serial1.begin(3000000);
+	
+	
+	GPIO1_GDIR &= ~(0xff000000u); // Set data pins to input
+	IOMUXC_GPR_GPR26 &= ~(0xff000000u); // Set data pins to use GPIO1
+	
+	dma_channel.begin();
+	dma_channel.source(GPIO1_DR);
+	dma_channel.destinationBuffer(buf, 80 * 4);
+	
+	
+	
+	dma_channel.interruptAtCompletion();
+	dma_channel.attachInterrupt(on_dma);
+	
+	
+	CCM_CCGR2 |= CCM_CCGR2_XBAR1(CCM_CCGR_ON);
+	IOMUXC_SW_MUX_CTL_PAD_GPIO_EMC_06 = 3;
+	IOMUXC_GPR_GPR6 &= ~(IOMUXC_GPR_GPR6_IOMUXC_XBAR_DIR_SEL_8);
+	IOMUXC_XBAR1_IN08_SELECT_INPUT = 0;
+	XBARA1_CTRL0 = XBARA_CTRL_STS0 | XBARA_CTRL_EDGE0(2) | XBARA_CTRL_DEN0;
+	xbar_connect(XBARA1_IN_IOMUX_XBAR_INOUT08, XBARA1_OUT_DMA_CH_MUX_REQ30);
+	dma_channel.triggerAtHardwareEvent(DMAMUX_SOURCE_XBAR1_0);
+	dma_channel.disableOnCompletion();
+	
+	dma_channel.enable();
+	
+	
+	
+	
+	
+	
 	
 	pinMode(RESET_gpio, OUTPUT);
 	pinMode(XCLK_gpio, OUTPUT);
 	
 	pinMode(VSYNC_gpio, INPUT);
 	pinMode(HREF_gpio, INPUT);
-	pinMode(PCLK_gpio, INPUT);
-	for (u8 i = 0; i < 8; i++) pinMode(DATA_PINS[i], INPUT);
-	
-	digitalWrite(RESET_gpio, LOW);
+	// pinMode(PCLK_gpio, INPUT);
+	// for (u8 i = 0; i < 8; i++) pinMode(DATA_PINS[i], INPUT);
 	
 	analogWriteFrequency(XCLK_gpio, XCLK_FREQUENCY);
 	analogWrite(XCLK_gpio, 128);
-	
-	delay(10);
-	
 	digitalWrite(RESET_gpio, HIGH);
+	
+	pinMode(11, OUTPUT);
+	analogWriteFrequency(11, 10000.0);
+	analogWrite(11, 128);
+	
+	
+	
 	delay(1);
 	
 	sccb_write(0xff, 1).unwrap();
@@ -90,118 +131,72 @@ int main() {
 	delay(10);
 	
 	while (!Serial) delay(50);
-	printf("Hello!\n");
+	
+	
+	
+	// Serial.printf("ATTR: %d\n", dma_channel.TCD->ATTR);
+	// Serial.printf("ATTR_DST: %d\n", dma_channel.TCD->ATTR_DST);
+	// Serial.printf("ATTR_SRC: %d\n", dma_channel.TCD->ATTR_SRC);
+	// Serial.printf("BITER: %d\n", dma_channel.TCD->BITER);
+	// Serial.printf("BITER_ELINKNO: %d\n", dma_channel.TCD->BITER_ELINKNO);
+	// Serial.printf("BITER_ELINKYES: %d\n", dma_channel.TCD->BITER_ELINKYES);
+	// Serial.printf("CITER: %d\n", dma_channel.TCD->CITER);
+	// Serial.printf("CITER_ELINKNO: %d\n", dma_channel.TCD->CITER_ELINKNO);
+	// Serial.printf("CITER_ELINKYES: %d\n", dma_channel.TCD->CITER_ELINKYES);
+	// Serial.printf("CSR: %d\n", dma_channel.TCD->CSR);
+	// Serial.printf("DADDR: %x\n", dma_channel.TCD->DADDR);
+	// Serial.printf("DLASTSGA: %d\n", dma_channel.TCD->DLASTSGA);
+	// Serial.printf("DOFF: %d\n", dma_channel.TCD->DOFF);
+	// Serial.printf("NBYTES: %d\n", dma_channel.TCD->NBYTES);
+	// Serial.printf("NBYTES_MLNO: %d\n", dma_channel.TCD->NBYTES_MLNO);
+	// Serial.printf("NBYTES_MLOFFNO: %d\n", dma_channel.TCD->NBYTES_MLOFFNO);
+	// Serial.printf("NBYTES_MLOFFYES: %d\n", dma_channel.TCD->NBYTES_MLOFFYES);
+	// Serial.printf("SADDR: %x\n", dma_channel.TCD->SADDR);
+	// Serial.printf("SLAST: %d\n", dma_channel.TCD->SLAST);
+	// Serial.printf("SOFF: %d\n", dma_channel.TCD->SOFF);
+	
+	
+	
+	// Serial.printf("monitoring...\n");
+	// dma_channel.enable();
+	// while (true) {
+	// 	let x = dma_channel.TCD->CITER;
+	// 	Serial.printf("%d\n", x);
+	// 	if (x >= 640) break;
+	// }
 	
 	
 	write_regs(ov2640_init_regs);
 	write_regs(ov2640_size_change_preamble_regs);
+	
 	write_regs(ov2640_qvga_regs);
+	// write_regs(ov2640_vga_regs);
+	// write_regs(ov2640_uxga_regs);
 	
 	write_regs(ov2640_raw10_regs);
-	
-	printf("Written regs\n");
-	
+	// write_regs(ov2640_rgb565_le_regs);
 	// write_regs(ov2640_jpeg_regs);
 	
 	
-	delay(1);
-	
 	sccb_write(0xff, 1).unwrap();
-	sccb_write(CLKRC, CLKRC_DIV_SET(8)).unwrap(); // Clock divider (max 64)
-	// sccb_write(COM7, COM7_RES_UXGA | COM7_ZOOM_EN | COM7_COLOR_BAR_TEST).unwrap(); // Color bar test
-	
-	// sccb_write(0xff, 0).unwrap();
-	// sccb_write(0xc2, 0x00000010).unwrap(); // Enable raw
-	// sccb_write(0xda, 0b00000100).unwrap(); // Select raw
-	
-	delay(10);
+	sccb_write(CLKRC, CLKRC_DIV_SET(64)).unwrap(); // Clock divider (max 64)
+	// sccb_write(CTRL1, ~(CTRL1_AWB | CTRL1_AWB_GAIN)).unwrap();
 	
 	
 	attachInterrupt(digitalPinToInterrupt(VSYNC_gpio), on_vsync, FALLING);
 	attachInterrupt(digitalPinToInterrupt(HREF_gpio), on_href, FALLING);
-	attachInterrupt(digitalPinToInterrupt(PCLK_gpio), on_pclk, FALLING);
+	// attachInterrupt(digitalPinToInterrupt(PCLK_gpio), on_pclk, FALLING);
 	
 	return 0;
 	
-	u32 count = 0;
-	u32 count_2 = 0;
-	bool href_past = 0;
-	bool vsync_past = 0;
-	
-	while (true) {
-		bool href = digitalReadFast(HREF_gpio);
-		bool vsync = digitalReadFast(VSYNC_gpio);
-		
-		if (vsync && href) {
-			u8 value = GPIO6_PSR >> 24;
-			printf("%d: %d %d\t%d\n", i, href, vsync, value);
-		}
-		// i = 0;
-		
-		// if (!href && (href != href_past)) {
-		// 	count++;
-		// 	// printf("h\n");
-		// }
-		
-		// if (!vsync && (vsync != vsync_past)) {
-		// 	printf("\n%d href in 1 vsync\n\n", count);
-		// 	if (count > 100) {
-		// 		count_2++;
-		// 		if (count_2 >= 1) {
-		// 			for (u32 j = 0; j < BUF_SIZE; j++) {
-		// 				if (!(buf[i] >> 4)) printf("0");
-		// 				printf("%x", buf[i]);
-		// 			}
-		// 			printf("\n\n%d out of %d samples captured\n", i, BUF_SIZE);
-					
-		// 			exit(0);
-		// 		}
-		// 	}
-		// 	count = 0;
-		// } else if (vsync && (vsync != vsync_past)) {
-		// 	printf("%d href outside vsync\n", count);
-		// 	count = 0;
-		// }
-		
-		// href_past = href;
-		// vsync_past = vsync;
-		
-		// delay(1);
-		
-		// u32 time = ARM_DWT_CYCCNT;
-		// u8 value = GPIO6_PSR >> 24;
-		// printf("%d %d %d %d\n", digitalReadFast(PCLK), digitalReadFast(HREF), digitalReadFast(VSYNC), value);
-	}
-	
-	
-	return 0;
+	// u32 time = ARM_DWT_CYCCNT;
+	// u8 value = GPIO6_PSR >> 24;
 }
 
 
 
 
 
-// Nonzero regs: 0x5, 0x28, 0x29, 0x2b, 0x33, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x47, 0x48, 0x49, 0x4a, 0x51, 0x52, 0x55, 0x5a, 0x5b, 0x60, 0x76, 0x78, 0x79, 0x86, 0x87, 0x88, 0x89, 0x8b, 0x91, 0x93, 0x97, 0xa7, 0xb0, 0xb1, 0xb2, 0xb5, 0xb8, 0xb9, 0xba, 0xbc, 0xbd, 0xbe, 0xbf, 0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc9, 0xcb, 0xcc, 0xcd, 0xce, 0xcf, 0xd0, 0xd2, 0xd3, 0xd5, 0xd8, 0xd9, 0xdd, 0xdf, 0xe0, 0xe1, 0xe2, 0xe3, 0xe5, 0xe9, 0xea, 0xeb, 0xec, 0xed, 0xf0, 0xf1, 0xf2, 0xf3, 0xf7, 0xf9, 0xfe, 0x103, 0x104, 0x108, 0x10a, 0x10b, 0x10c, 0x10d, 0x10e, 0x10f, 0x110, 0x113, 0x114, 0x117, 0x118, 0x119, 0x11a, 0x11c, 0x11d, 0x11e, 0x124, 0x125, 0x126, 0x127, 0x128, 0x12f, 0x130, 0x131, 0x132, 0x133, 0x134, 0x135, 0x137, 0x138, 0x139, 0x13a, 0x13b, 0x13c, 0x13d, 0x13e, 0x13f, 0x142, 0x14a, 0x14b, 0x14c, 0x14d, 0x14f, 0x150, 0x151, 0x152, 0x153, 0x154, 0x155, 0x156, 0x15d, 0x15e, 0x15f, 0x160, 0x161, 0x162, 0x16c, 0x16f, 0x170, 0x171, 0x172, 0x173, 0x174, 0x175, 0x176, 0x177, 0x178, 0x179, 0x17a, 0x17b, 0x17c, 0x17d
-
-// Regs that change on their own:
-// 0x93: 9
-// 0xc9: 8
-// 0xfa: 115
-// 0xfc: 114
-// 0x100: 13
-// 0x104: 6
-// 0x110: 7
-// 0x12f: 5
-// 0x145: 5
-// 0x164: 7
-// 0x165: 7
-// 0x166: 5
-// 0x167: 5
-// 0x168: 7
-// 0x169: 7
-// 0x16a: 5
-// 0x16b: 5
-// 0x17f: 10
 
 
 

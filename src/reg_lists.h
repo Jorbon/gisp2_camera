@@ -331,6 +331,7 @@ static const RegisterEntry ov2640_rgb565_be_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
 	{ IMAGE_MODE, IMAGE_MODE_RGB565 },
+	// { CTRL0, CTRL0_RGB_EN },
 	{ 0xd7, 0x03 },
 	{ RESET,  0x00 },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
@@ -341,6 +342,7 @@ static const RegisterEntry ov2640_rgb565_le_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
 	{ IMAGE_MODE, IMAGE_MODE_LBYTE_FIRST | IMAGE_MODE_RGB565 },
+	// { CTRL0, CTRL0_RGB_EN },
 	{ 0xd7, 0x03 },
 	{ RESET,  0x00 },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
@@ -360,9 +362,18 @@ static const RegisterEntry ov2640_raw10_regs[] = {
 
 
 
-// i think do yuyv pixel format first
 static const RegisterEntry ov2640_jpeg_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
+	{ R_BYPASS, R_BYPASS_USE_DSP },
+	{ IMAGE_MODE, IMAGE_MODE_YUV422 },
+	{ 0xd7, 0x03 },
+	{ 0x33, 0xa0 },
+	{ 0xe5, 0x1f },
+	{ 0xe1, 0x67 },
+	{ RESET,  0x00 },
+	{ R_BYPASS, R_BYPASS_USE_DSP },
+	
+	// { BANK_SEL, BANK_SEL_DSP },
 	{ 0xe0, 0x14 },
 	{ 0xe1, 0x77 },
 	{ 0xe5, 0x1f },

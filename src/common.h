@@ -59,4 +59,22 @@ struct Result {
 
 
 
+// copied from pwm.c
+void xbar_connect(unsigned int input, unsigned int output)
+{
+	if (input >= 88) return;
+	if (output >= 132) return;
+
+	volatile uint16_t *xbar = &XBARA1_SEL0 + (output / 2);
+	uint16_t val = *xbar;
+	if (!(output & 1)) {
+		val = (val & 0xFF00) | input;
+	} else {
+		val = (val & 0x00FF) | (input << 8);
+	}
+	*xbar = val;
+}
+
+
+
 #endif
