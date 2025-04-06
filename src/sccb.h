@@ -16,19 +16,19 @@ Result<Unit> get_error_message(u8 result) {
 	}
 }
 
-Result<Unit, const char*> sccb_write(u8 reg, u8 value) {
-	Wire.beginTransmission(I2S_ADDRESS);
+Result<Unit, const char*> sccb_write(u8 address, u8 reg, u8 value) {
+	Wire.beginTransmission(address);
 	Wire.write(reg);
 	Wire.write(value);
 	return get_error_message(Wire.endTransmission());
 }
 
-Result<u8, const char*> sccb_read(u8 reg) {
-	Wire.beginTransmission(I2S_ADDRESS);
+Result<u8, const char*> sccb_read(u8 address, u8 reg) {
+	Wire.beginTransmission(address);
 	Wire.write(reg);
 	let result = get_error_message(Wire.endTransmission());
 	
-	Wire.requestFrom(I2S_ADDRESS, 1);
+	Wire.requestFrom((int) address, 1);
 	let value = Wire.read();
 	
 	switch (result.type) {
