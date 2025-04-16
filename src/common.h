@@ -55,6 +55,12 @@ struct Result {
 		
 		return this->value.ok_value;
 	}
+	
+	void report() const {
+		if (this-> type != ResultType::Ok) {
+			fprintf(stderr, "\n%s\n", this->value.err_value);
+		}
+	}
 };
 
 

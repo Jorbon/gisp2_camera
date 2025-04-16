@@ -17,28 +17,30 @@ Result<Unit> get_error_message(u8 result) {
 }
 
 Result<Unit, const char*> sccb_write(u8 address, u8 reg, u8 value) {
-	Wire.beginTransmission(address);
-	Wire.write(reg);
-	Wire.write(value);
-	return get_error_message(Wire.endTransmission());
+	Wire2.beginTransmission(address);
+	Wire2.write(reg);
+	Wire2.write(value);
+	return get_error_message(Wire2.endTransmission());
 }
 
 Result<u8, const char*> sccb_read(u8 address, u8 reg) {
-	Wire.beginTransmission(address);
-	Wire.write(reg);
+	Wire2.beginTransmission(address);
+	Wire2.write(reg);
 	let result = get_error_message(Wire.endTransmission());
 	
-	Wire.requestFrom((int) address, 1);
-	let value = Wire.read();
+	Wire2.requestFrom((int) address, 1);
+	let value = Wire2.read();
 	
 	switch (result.type) {
-		case ResultType::Ok:  return Result<u8>::ok(value);
+		case ResultType::Ok : return Result<u8>::ok(value);
 		case ResultType::Err: return Result<u8>::err(result.value.err_value);
 	}
 	
 	fprintf(stderr, "Result type error\n");
 	exit(1);
 }
+
+
 
 
 #endif

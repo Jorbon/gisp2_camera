@@ -12,6 +12,16 @@ struct RegisterEntry {
 };
 
 
+void write_regs(u8 address, RegisterEntry const* regs) {
+	while (true) {
+		let reg = *regs;
+		if (reg.address == 0xff && reg.value == 0xff) break;
+		sccb_write(address, reg.address, reg.value).unwrap();
+		regs++;
+	}
+}
+
+
 /*
 * Registers settings. Most of them are undocumented. Some documentation is
 * is available in the OV2640 datasheet, the OV2640 hardware app notes and
@@ -20,7 +30,7 @@ struct RegisterEntry {
 
 #define ENDMARKER { 0xff, 0xff }
 
-static const RegisterEntry ov2640_init_regs[] = {
+const RegisterEntry ov2640_init_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ 0x2c,   0xff },
 	{ 0x2e,   0xdf },
@@ -206,7 +216,7 @@ static const RegisterEntry ov2640_init_regs[] = {
 #define W_UXGA	1600
 #define H_UXGA	1200
 
-static const RegisterEntry ov2640_size_change_preamble_regs[] = {
+const RegisterEntry ov2640_size_change_preamble_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ RESET, RESET_DVP },
 	{ HSIZE8, HSIZE8_SET(W_UXGA) },
@@ -236,42 +246,42 @@ static const RegisterEntry ov2640_size_change_preamble_regs[] = {
 
 #define W_QCIF	176
 #define H_QCIF	144
-static const RegisterEntry ov2640_qcif_regs[] = {
+const RegisterEntry ov2640_qcif_regs[] = {
 	PER_SIZE_REG_SEQ(W_QCIF, H_QCIF, 3, 3, 4),
 	ENDMARKER
 };
 
 #define W_QVGA	320
 #define H_QVGA	240
-static const RegisterEntry ov2640_qvga_regs[] = {
+const RegisterEntry ov2640_qvga_regs[] = {
 	PER_SIZE_REG_SEQ(W_QVGA, H_QVGA, 2, 2, 4),
 	ENDMARKER
 };
 
 #define W_CIF	352
 #define H_CIF	288
-static const RegisterEntry ov2640_cif_regs[] = {
+const RegisterEntry ov2640_cif_regs[] = {
 	PER_SIZE_REG_SEQ(W_CIF, H_CIF, 2, 2, 8),
 	ENDMARKER
 };
 
 #define W_VGA	640
 #define H_VGA	480
-static const RegisterEntry ov2640_vga_regs[] = {
+const RegisterEntry ov2640_vga_regs[] = {
 	PER_SIZE_REG_SEQ(W_VGA, H_VGA, 0, 0, 2),
 	ENDMARKER
 };
 
 #define W_SVGA	800
 #define H_SVGA	600
-static const RegisterEntry ov2640_svga_regs[] = {
+const RegisterEntry ov2640_svga_regs[] = {
 	PER_SIZE_REG_SEQ(W_SVGA, H_SVGA, 1, 1, 2),
 	ENDMARKER
 };
 
 #define W_XGA	1024
 #define H_XGA	768
-static const RegisterEntry ov2640_xga_regs[] = {
+const RegisterEntry ov2640_xga_regs[] = {
 	PER_SIZE_REG_SEQ(W_XGA, H_XGA, 0, 0, 2),
 	{ CTRLI,    0x00},
 	ENDMARKER
@@ -279,7 +289,7 @@ static const RegisterEntry ov2640_xga_regs[] = {
 
 #define W_SXGA	1280
 #define H_SXGA	1024
-static const RegisterEntry ov2640_sxga_regs[] = {
+const RegisterEntry ov2640_sxga_regs[] = {
 	PER_SIZE_REG_SEQ(W_SXGA, H_SXGA, 0, 0, 2),
 	{ CTRLI,    0x00},
 	{ R_DVP_SP, 2 | R_DVP_SP_AUTO_MODE },
@@ -288,7 +298,7 @@ static const RegisterEntry ov2640_sxga_regs[] = {
 
 // #define W_UXGA	1600
 // #define H_UXGA	1200
-static const RegisterEntry ov2640_uxga_regs[] = {
+const RegisterEntry ov2640_uxga_regs[] = {
 	PER_SIZE_REG_SEQ(W_UXGA, H_UXGA, 0, 0, 0),
 	{ CTRLI,    0x00},
 	{ R_DVP_SP, 0 | R_DVP_SP_AUTO_MODE },
@@ -302,7 +312,7 @@ static const RegisterEntry ov2640_uxga_regs[] = {
 * Register settings for pixel formats
 */
 
-static const RegisterEntry ov2640_yuyv_regs[] = {
+const RegisterEntry ov2640_yuyv_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
 	{ IMAGE_MODE, IMAGE_MODE_YUV422 },
@@ -315,7 +325,7 @@ static const RegisterEntry ov2640_yuyv_regs[] = {
 	ENDMARKER
 };
 
-static const RegisterEntry ov2640_uyvy_regs[] = {
+const RegisterEntry ov2640_uyvy_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
 	{ IMAGE_MODE, IMAGE_MODE_LBYTE_FIRST | IMAGE_MODE_YUV422 },
@@ -327,7 +337,7 @@ static const RegisterEntry ov2640_uyvy_regs[] = {
 	ENDMARKER
 };
 
-static const RegisterEntry ov2640_rgb565_be_regs[] = {
+const RegisterEntry ov2640_rgb565_be_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
 	{ IMAGE_MODE, IMAGE_MODE_RGB565 },
@@ -338,7 +348,7 @@ static const RegisterEntry ov2640_rgb565_be_regs[] = {
 	ENDMARKER
 };
 
-static const RegisterEntry ov2640_rgb565_le_regs[] = {
+const RegisterEntry ov2640_rgb565_le_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
 	{ IMAGE_MODE, IMAGE_MODE_LBYTE_FIRST | IMAGE_MODE_RGB565 },
@@ -349,7 +359,7 @@ static const RegisterEntry ov2640_rgb565_le_regs[] = {
 	ENDMARKER
 };
 
-static const RegisterEntry ov2640_raw10_regs[] = {
+const RegisterEntry ov2640_raw10_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
 	{ IMAGE_MODE, IMAGE_MODE_RAW10 },
@@ -362,7 +372,7 @@ static const RegisterEntry ov2640_raw10_regs[] = {
 
 
 
-static const RegisterEntry ov2640_jpeg_regs[] = {
+const RegisterEntry ov2640_jpeg_regs[] = {
 	{ BANK_SEL, BANK_SEL_DSP },
 	{ R_BYPASS, R_BYPASS_USE_DSP },
 	{ IMAGE_MODE, IMAGE_MODE_YUV422 },
@@ -412,7 +422,7 @@ static const RegisterEntry ov2640_jpeg_regs[] = {
 
 
 
-const struct RegisterEntry OV2640_JPEG_INIT[] =
+const RegisterEntry OV2640_JPEG_INIT[] =
 {
   { 0xff, 0x00 },
   { 0x2c, 0xff },
@@ -612,7 +622,7 @@ const struct RegisterEntry OV2640_JPEG_INIT[] =
 
 
 
-const struct RegisterEntry OV2640_YUV422[] =
+const RegisterEntry OV2640_YUV422[] =
 {
   { 0xFF, 0x00 },
   { 0x05, 0x00 },
@@ -627,7 +637,7 @@ const struct RegisterEntry OV2640_YUV422[] =
 };
 
 
-const struct RegisterEntry OV2640_JPEG[] =  
+const RegisterEntry OV2640_JPEG[] =  
 {
   { 0xe0, 0x14 },
   { 0xe1, 0x77 },
@@ -654,7 +664,7 @@ const struct RegisterEntry OV2640_JPEG[] =
 
 
 /* JPG 160x120 */
-const struct RegisterEntry OV2640_160x120_JPEG[] =  
+const RegisterEntry OV2640_160x120_JPEG[] =  
 {
   { 0xff, 0x01 },
   { 0x12, 0x40 },
@@ -700,7 +710,7 @@ const struct RegisterEntry OV2640_160x120_JPEG[] =
 
 /* JPG, 0x176x144 */
 
-const struct RegisterEntry OV2640_176x144_JPEG[] =  
+const RegisterEntry OV2640_176x144_JPEG[] =  
 {
   { 0xff, 0x01 },
   { 0x12, 0x40 },
@@ -746,7 +756,7 @@ const struct RegisterEntry OV2640_176x144_JPEG[] =
 
 /* JPG 320x240 */
 
-const struct RegisterEntry OV2640_320x240_JPEG[] =  
+const RegisterEntry OV2640_320x240_JPEG[] =  
 {
   { 0xff, 0x01 },
   { 0x12, 0x40 },
@@ -792,7 +802,7 @@ const struct RegisterEntry OV2640_320x240_JPEG[] =
 
 /* JPG 352x288 */
 
-const struct RegisterEntry OV2640_352x288_JPEG[] =  
+const RegisterEntry OV2640_352x288_JPEG[] =  
 
 {
   { 0xff, 0x01 },
@@ -838,7 +848,7 @@ const struct RegisterEntry OV2640_352x288_JPEG[] =
 };
 
 /* JPG 640x480 */
-const struct RegisterEntry OV2640_640x480_JPEG[] =  
+const RegisterEntry OV2640_640x480_JPEG[] =  
 {
 	{0xff, 0x01},
 	{0x11, 0x01},
@@ -886,7 +896,7 @@ const struct RegisterEntry OV2640_640x480_JPEG[] =
 };     
     
 /* JPG 800x600 */
-const struct RegisterEntry OV2640_800x600_JPEG[] =  
+const RegisterEntry OV2640_800x600_JPEG[] =  
 {
 	{0xff, 0x01},
 	{0x11, 0x01},
@@ -934,7 +944,7 @@ const struct RegisterEntry OV2640_800x600_JPEG[] =
 };     
        
 /* JPG 1024x768 */
-const struct RegisterEntry OV2640_1024x768_JPEG[] =  
+const RegisterEntry OV2640_1024x768_JPEG[] =  
 {
 	{0xff, 0x01},
 	{0x11, 0x01},
@@ -981,7 +991,7 @@ const struct RegisterEntry OV2640_1024x768_JPEG[] =
 };  
 
    /* JPG 1280x1024 */
-const struct RegisterEntry OV2640_1280x1024_JPEG[] =  
+const RegisterEntry OV2640_1280x1024_JPEG[] =  
 {
 	{0xff, 0x01},
 	{0x11, 0x01},
@@ -1029,7 +1039,7 @@ const struct RegisterEntry OV2640_1280x1024_JPEG[] =
 };         
        
    /* JPG 1600x1200 */
-const struct RegisterEntry OV2640_1600x1200_JPEG[] =  
+const RegisterEntry OV2640_1600x1200_JPEG[] =  
 {
 	{0xff, 0x01},
 	{0x11, 0x01},
