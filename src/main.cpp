@@ -21,7 +21,7 @@
 const u8 DATA_PINS[8 * 3] = {
 	22, 23, 20, 21, 38, 39, 26, 27, // GPIO6_PSR >> 24
 	19, 18, 14, 15, 40, 41, 17, 16, // GPIO6_PSR >> 16
-	37, 36,  7,  8, 13, 11, 12, 10, // ((GPIO7_PSR >> 12) & 0b11110000) | (GPIO7_PSR | 0b1111)
+	37, 36,  7,  8, 13, 11, 12, 10, // ((GPIO7_PSR >> 12) & 0b11110000) | (GPIO7_PSR & 0b1111)
 };
 
 // Remaining pins:
@@ -172,42 +172,188 @@ void init_camera(u8 id, u8 resolution, u8 clock_divisor) {
 	
 // }
 
+void on_pclk_0();
+void on_pclk_1();
+void on_pclk_2();
 
+
+bool previous_ff = false;
+bool data_on = false;
 
 void on_pclk_0() {
 	u8 value = GPIO6_PSR >> 24;
-	Serial.write(value);
+	if (data_on) {
+		Serial.write(value);
+		// if (value >= 33 && value <= 126) printf("%c ", value);
+		// else printf("%02x ", value);
+		// printf("%d ", ARM_DWT_CYCCNT);
+	}
+	
+	switch (value) {
+		case 0xff:
+			previous_ff = true;
+			break;
+		case 0xd8:
+			if (previous_ff) {
+				data_on = true;
+				previous_ff = false;
+			}
+			break;
+		case 0xd9:
+			if (previous_ff && data_on) {
+				detachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]));
+				previous_ff = false;
+				data_on = false;
+				printf("\nimg 1\n");
+				attachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]), on_pclk_1, FALLING);
+				
+			}
+			break;
+		default:
+			previous_ff = false;
+			break;
+	}
 }
 
 void on_pclk_1() {
 	u8 value = GPIO6_PSR >> 16;
-	Serial.write(value);
+	if (data_on) {
+		Serial.write(value);
+		// if (value >= 33 && value <= 126) printf("%c ", value);
+		// else printf("%02x ", value);
+		// printf("%d ", ARM_DWT_CYCCNT);
+	}
+	
+	switch (value) {
+		case 0xff:
+			previous_ff = true;
+			break;
+		case 0xd8:
+			if (previous_ff) {
+				data_on = true;
+				previous_ff = false;
+			}
+			break;
+		case 0xd9:
+			if (previous_ff && data_on) {
+				detachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]));
+				previous_ff = false;
+				data_on = false;
+				printf("\nimg 2\n");
+				attachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]), on_pclk_2, FALLING);
+			}
+			break;
+		default:
+			previous_ff = false;
+			break;
+	}
 }
 
 void on_pclk_2() {
-	u8 value = ((GPIO7_PSR >> 12) & 0b11110000) | (GPIO7_PSR | 0b1111);
-	Serial.write(value);
-}
-
-
-void on_vsync() {
-	if (digitalReadFast(VSYNC_PINS[0])) {
-		attachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]), on_pclk_0, FALLING);
-	} else {
-		detachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]));
+	u8 value = ((GPIO7_PSR >> 12) & 0b11110000) | (GPIO7_PSR & 0b1111);
+	if (data_on) {
+		Serial.write(value);
+		// if (value >= 33 && value <= 126) printf("%c ", value);
+		// else printf("%02x ", value);
+		// printf("%d ", ARM_DWT_CYCCNT);
+	}
+	
+	switch (value) {
+		case 0xff:
+			previous_ff = true;
+			break;
+		case 0xd8:
+			if (previous_ff) {
+				data_on = true;
+				previous_ff = false;
+			}
+			break;
+		case 0xd9:
+			if (previous_ff && data_on) {
+				detachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]));
+				previous_ff = false;
+				data_on = false;
+				printf("\nimg 0\n");
+				attachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]), on_pclk_0, FALLING);
+			}
+			break;
+		default:
+			previous_ff = false;
+			break;
 	}
 }
 
 
+
+
+// void on_vsync_0_rising();
+// void on_vsync_1_rising();
+// void on_vsync_2_rising();
+// void on_vsync_0_falling();
+// void on_vsync_1_falling();
+// void on_vsync_2_falling();
+
+
+// void on_vsync_0_rising() {
+// 	attachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]), on_pclk_0, FALLING);
+// 	detachInterrupt(digitalPinToInterrupt(VSYNC_PINS[0]));
+// 	attachInterrupt(digitalPinToInterrupt(VSYNC_PINS[0]), on_vsync_0_falling, FALLING);
+// 	Serial.write("___VS_AAA_ON___");
+// }
+
+// void on_vsync_0_falling() {
+// 	detachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]));
+// 	detachInterrupt(digitalPinToInterrupt(VSYNC_PINS[0]));
+// 	attachInterrupt(digitalPinToInterrupt(VSYNC_PINS[1]), on_vsync_1_rising, RISING);
+// 	Serial.write("___VS_AAA_OFF___");
+// }
+
+// void on_vsync_1_rising() {
+// 	attachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]), on_pclk_1, FALLING);
+// 	detachInterrupt(digitalPinToInterrupt(VSYNC_PINS[1]));
+// 	attachInterrupt(digitalPinToInterrupt(VSYNC_PINS[1]), on_vsync_1_falling, FALLING);
+// 	Serial.write("___VS_BBB_ON___");
+// }
+
+// void on_vsync_1_falling() {
+// 	detachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]));
+// 	detachInterrupt(digitalPinToInterrupt(VSYNC_PINS[1]));
+// 	attachInterrupt(digitalPinToInterrupt(VSYNC_PINS[2]), on_vsync_2_rising, RISING);
+// 	Serial.write("___VS_BBB_OFF___");
+// }
+
+// void on_vsync_2_rising() {
+// 	attachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]), on_pclk_2, FALLING);
+// 	detachInterrupt(digitalPinToInterrupt(VSYNC_PINS[2]));
+// 	attachInterrupt(digitalPinToInterrupt(VSYNC_PINS[2]), on_vsync_2_falling, FALLING);
+// 	Serial.write("___VS_CCC_ON___");
+// }
+
+// void on_vsync_2_falling() {
+// 	detachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]));
+// 	detachInterrupt(digitalPinToInterrupt(VSYNC_PINS[2]));
+// 	attachInterrupt(digitalPinToInterrupt(VSYNC_PINS[0]), on_vsync_0_rising, RISING);
+// 	Serial.write("___VS_CCC_OFF___");
+// }
+
+
+
+
+
+
+
 void configure_cameras(u8 resolution, u8 clock_divisor) {
-	detachInterrupt(digitalPinToInterrupt(VSYNC_PINS[0]));
-	for (u8 i = 0; i < N_CAMERAS; i++) detachInterrupt(digitalPinToInterrupt(PCLK_PINS[i]));
+	for (u8 i = 0; i < N_CAMERAS; i++) {
+		// detachInterrupt(digitalPinToInterrupt(VSYNC_PINS[i]));
+		detachInterrupt(digitalPinToInterrupt(PCLK_PINS[i]));
+	}
 	
 	for (u8 i = 0; i < N_CAMERAS; i++) digitalWrite(RESET_PINS[i], LOW);
 	delay(10);
 	for (u8 id = 1; id <= N_CAMERAS; id++) init_camera(id, resolution, clock_divisor);
 	
-	attachInterrupt(digitalPinToInterrupt(VSYNC_PINS[0]), on_vsync, CHANGE);
+	// attachInterrupt(digitalPinToInterrupt(VSYNC_PINS[0]), on_vsync_0_rising, RISING);
+	attachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]), on_pclk_0, FALLING);
 }
 
 
@@ -242,6 +388,8 @@ int main() {
 	
 	while (!Serial) delay(50);
 	
+	printf("hello\n");
+	
 	for (u8 i = 0; i < N_CAMERAS; i++) {
 		pinMode(VSYNC_PINS[i], INPUT);
 		pinMode(RESET_PINS[i], OUTPUT);
@@ -257,7 +405,7 @@ int main() {
 	
 	configure_cameras(resolution, clock_divisor);
 	
-	
+	printf("configured\n");
 	
 	while (true) {
 		
@@ -265,16 +413,9 @@ int main() {
 		
 		u8 byte = Serial.read();
 		
-		switch (byte >> 6) {
-			case 0b00:
-				resolution = byte & 0b111;
-				configure_cameras(resolution, clock_divisor);
-			break;
-			case 0b01:
-				clock_divisor = byte & 0b111111;
-				configure_cameras(resolution, clock_divisor);
-			break;
-		}
+		clock_divisor = byte & 0b11111;
+		resolution = (byte >> 5) & 0b111;
+		configure_cameras(resolution, clock_divisor);
 		
 		
 	}
