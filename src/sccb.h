@@ -16,14 +16,34 @@ Result<Unit> get_error_message(u8 result) {
 	}
 }
 
-Result<Unit, const char*> sccb_write(u8 address, u8 reg, u8 value) {
+Result<Unit> sccb_write(u8 address, u8 reg, u8 value) {
 	Wire2.beginTransmission(address);
 	Wire2.write(reg);
 	Wire2.write(value);
 	return get_error_message(Wire2.endTransmission());
 }
 
-Result<u8, const char*> sccb_read(u8 address, u8 reg) {
+
+#define RETRIES 8
+
+Result<Unit> sccb_write_with_retries(u8 address, u8 reg, u8 value) {
+	const u32 retry_timeouts[RETRIES] = {0, 0, 0, 1, 5, 10, 50, 100};
+	
+	let result = sccb_write(address, reg, value);
+	if (result.type == ResultType::Ok) return Result<Unit>::ok(UNIT);
+	
+	for (let i = 0; i < RETRIES; i++) {
+		delay(retry_timeouts[i]);
+		result = sccb_write(address, reg, value);
+		if (result.type == ResultType::Ok) return result;
+	}
+	
+	return result;
+}
+
+
+
+Result<u8> sccb_read(u8 address, u8 reg) {
 	Wire2.beginTransmission(address);
 	Wire2.write(reg);
 	let result = get_error_message(Wire.endTransmission());
@@ -34,10 +54,8 @@ Result<u8, const char*> sccb_read(u8 address, u8 reg) {
 	switch (result.type) {
 		case ResultType::Ok : return Result<u8>::ok(value);
 		case ResultType::Err: return Result<u8>::err(result.value.err_value);
+		default: return Result<u8>::err("Result type error");
 	}
-	
-	fprintf(stderr, "Result type error\n");
-	exit(1);
 }
 
 

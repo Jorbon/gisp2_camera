@@ -12,13 +12,18 @@ struct RegisterEntry {
 };
 
 
-void write_regs(u8 address, RegisterEntry const* regs) {
+Result<Unit> write_regs(u8 address, RegisterEntry const* regs) {
 	while (true) {
 		let reg = *regs;
 		if (reg.address == 0xff && reg.value == 0xff) break;
-		sccb_write(address, reg.address, reg.value).unwrap();
+		
+		let result = sccb_write_with_retries(address, reg.address, reg.value);
+		if (result.type == ResultType::Err) return result;
+		
 		regs++;
 	}
+	
+	return Result<Unit>::ok(UNIT);
 }
 
 
