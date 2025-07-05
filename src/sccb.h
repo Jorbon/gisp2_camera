@@ -9,10 +9,10 @@
 Result<Unit> get_error_message(u8 result) {
 	switch(result) {
 		case 0:	return Result<Unit>::ok(UNIT);
-		case 2:	return Result<Unit>::err("NACK response from device\n");
-		case 4:	return Result<Unit>::err("Connection error\n");
-		case 5:	return Result<Unit>::err("FIFO error\n");
-		default: return Result<Unit>::err("Unknown error\n");
+		case 2:	return Result<Unit>::err("NACK response from device");
+		case 4:	return Result<Unit>::err("Connection error");
+		case 5:	return Result<Unit>::err("FIFO error");
+		default: return Result<Unit>::err("Unknown error");
 	}
 }
 

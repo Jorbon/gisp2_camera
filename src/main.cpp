@@ -10,7 +10,7 @@
 
 #define CAM_ID(n) (0x30|(n))
 
-#define N_CAMERAS 3
+#define N_CAMERAS 1
 
 
 #define SERIAL_RX_PIN  0
@@ -26,7 +26,7 @@ const u8 DATA_PINS[8 * 3] = {
 
 
 const u8 PCLK_PINS [3] = { 34, 32,  5 };
-const u8 XCLK_PINS [3] = { 33, 28, 29 };
+const u8 XCLK_PINS [3] = { 33, 29, 28 };
 const u8 RESET_PINS[3] = { 30,  6,  9 };
 const u8 HREF_PINS [3] = { 35, 31,  4 };
 
@@ -116,6 +116,10 @@ Result<Unit> init_camera(u8 i, u8 resolution, u8 clock_divisor) {
 
 
 
+bool use_camera   [3] = { true,  false, false };
+bool camera_status[3] = { false, false, false };
+
+
 void on_pclk_0();
 void on_pclk_1();
 void on_pclk_2();
@@ -146,10 +150,20 @@ void on_pclk_0() {
 		case 0xd9:
 			if (previous_ff) {
 				if (frame_started) {
-					detachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]));
-					frame_started = false;
-					Serial.write('1');
-					attachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]), on_pclk_1, FALLING);
+					if (camera_status[1]) {
+						detachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]));
+						frame_started = false;
+						Serial.write('1');
+						attachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]), on_pclk_1, FALLING);
+					} else if (camera_status[2]) {
+						detachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]));
+						frame_started = false;
+						Serial.write('2');
+						attachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]), on_pclk_2, FALLING);
+					} else {
+						frame_started = false;
+						Serial.write('0');
+					}
 				}
 				previous_ff = false;
 			}
@@ -167,6 +181,9 @@ void on_pclk_1() {
 	u8 value = reg >> 24;
 	Serial.write(value);
 	
+	// if (value >= 33 && value <= 126) printf("%c ", value);
+	// else printf("%02x ", value);
+	
 	switch (value) {
 		case 0xff:
 			previous_ff = true;
@@ -180,10 +197,20 @@ void on_pclk_1() {
 		case 0xd9:
 			if (previous_ff) {
 				if (frame_started) {
-					detachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]));
-					frame_started = false;
-					Serial.write('2');
-					attachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]), on_pclk_2, FALLING);
+					if (camera_status[2]) {
+						detachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]));
+						frame_started = false;
+						Serial.write('2');
+						attachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]), on_pclk_2, FALLING);
+					} else if (camera_status[0]) {
+						detachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]));
+						frame_started = false;
+						Serial.write('0');
+						attachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]), on_pclk_0, FALLING);
+					} else {
+						frame_started = false;
+						Serial.write('1');
+					}
 				}
 				previous_ff = false;
 			}
@@ -214,10 +241,20 @@ void on_pclk_2() {
 		case 0xd9:
 			if (previous_ff) {
 				if (frame_started) {
-					detachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]));
-					frame_started = false;
-					Serial.write('0');
-					attachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]), on_pclk_0, FALLING);
+					if (camera_status[0]) {
+						detachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]));
+						frame_started = false;
+						Serial.write('0');
+						attachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]), on_pclk_0, FALLING);
+					} else if (camera_status[1]) {
+						detachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]));
+						frame_started = false;
+						Serial.write('1');
+						attachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]), on_pclk_1, FALLING);
+					} else {
+						frame_started = false;
+						Serial.write('2');
+					}
 				}
 				previous_ff = false;
 			}
@@ -243,13 +280,33 @@ void configure_cameras(u8 resolution, u8 clock_divisor) {
 	for (u8 i = 0; i < N_CAMERAS; i++) digitalWrite(RESET_PINS[i], LOW);
 	delay(10);
 	for (u8 i = 0; i < N_CAMERAS; i++) {
+		if (!use_camera[i]) continue;
+		
 		let result = init_camera(i, resolution, clock_divisor);
 		if (result.type == ResultType::Err) {
-			printf("Error setting up camera %d: %s", i, result.value.err_value);
+			printf("Error setting up camera %d: %s\n", i, result.value.err_value);
+			camera_status[i] = false;
 		}
+		
+		camera_status[i] = (result.type == ResultType::Ok);
+		
+		// while (result.type == ResultType::Err) {
+		// 	printf("Error setting up camera %d: %s\n", i, result.value.err_value);
+		// 	digitalWrite(RESET_PINS[i], LOW);
+		// 	delay(1000);
+		// 	result = init_camera(i, resolution, clock_divisor);
+		// }
+		// printf("Success setting up camera %d!\n", i);
 	}
 	
-	attachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]), on_pclk_0, FALLING);
+	
+	if (camera_status[0]) {
+		attachInterrupt(digitalPinToInterrupt(PCLK_PINS[0]), on_pclk_0, FALLING);
+	} else if (camera_status[1]) {
+		attachInterrupt(digitalPinToInterrupt(PCLK_PINS[1]), on_pclk_1, FALLING);
+	} else if (camera_status[2]) {
+		attachInterrupt(digitalPinToInterrupt(PCLK_PINS[2]), on_pclk_2, FALLING);
+	}
 }
 
 
