@@ -10,7 +10,7 @@
 
 #define CAM_ID(n) (0x30|(n))
 
-#define N_CAMERAS 1
+#define N_CAMERAS 3
 
 
 #define SERIAL_RX_PIN  0
@@ -116,7 +116,7 @@ Result<Unit> init_camera(u8 i, u8 resolution, u8 clock_divisor) {
 
 
 
-bool use_camera   [3] = { true,  false, false };
+bool use_camera   [3] = { true , true , true  };
 bool camera_status[3] = { false, false, false };
 
 
@@ -328,7 +328,7 @@ int main() {
 	}
 	
 	
-	while (!Serial) delay(50);
+	// while (!Serial) delay(50);
 	
 	u8 resolution = 0;
 	u8 clock_divisor = CLKRC_DIV_SET(32);
